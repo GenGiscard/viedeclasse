@@ -174,6 +174,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .distr{display:flex;flex-direction:column;gap:6px}
 .drow{display:flex;align-items:center;gap:8px}
 .drow .b{height:22px;border:2px solid var(--ink);border-radius:6px;min-width:6px}
+.plist.compact{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px}
+.plist.compact .pl{padding:3px 6px;gap:6px;font-size:.85rem}
+.plist.compact .av{width:24px;height:24px;font-size:.65rem}
 .board-mini{display:flex;flex-direction:column;gap:5px}
 
 /* bombe */
@@ -213,7 +216,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 /* imposteur / prefs / chaine */
 .myword{font-family:var(--f-display);font-weight:800;font-size:clamp(2rem,7vw,3.2rem);text-align:center;background:var(--yellow);border:3px solid var(--ink);border-radius:16px;padding:6px 18px;display:inline-block;transform:rotate(-2deg);box-shadow:var(--sh)}
-.vlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.vlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(160px,100%),1fr));gap:8px}
 .vp{border:2px solid var(--ink);border-radius:14px;background:#fff;padding:10px;display:flex;flex-direction:column;gap:6px;text-align:left;cursor:default}
 .vp.can{cursor:pointer}
 .vp.can:hover{background:var(--soft)}
@@ -347,6 +350,7 @@ const Host = {
   player(id) { return this.room.players.find(p => p.id === id); },
   addPlayer(id, name, color) {
     name = String(name || 'Joueur').trim().slice(0, 16) || 'Joueur';
+    if (isRude(name)) name = 'Joueur ' + (this.room.players.length + 1);
     let n = name, i = 2;
     while (this.room.players.some(p => p.name.toLowerCase() === n.toLowerCase())) n = name.slice(0, 13) + ' ' + i++;
     const p = { id, name: n, color: AV_COLORS.includes(color) ? color : pick(AV_COLORS), score: 0, on: true };
@@ -708,6 +712,7 @@ function renderHome() {
 function needName() {
   const n = ($('#nm') ? $('#nm').value : S.me.name).trim();
   if (!n) { S.homeMsg = 'Choisis d’abord un pseudo.'; $('#homeMsg').textContent = S.homeMsg; $('#nm').focus(); $('#nm').classList.add('shake'); setTimeout(() => $('#nm') && $('#nm').classList.remove('shake'), 400); return false; }
+  if (isRude(n)) { S.homeMsg = 'Ce pseudo n\u2019est pas accepté. Choisis-en un autre.'; $('#homeMsg').textContent = S.homeMsg; $('#nm').focus(); return false; }
   S.me.name = n.slice(0, 16); store.set('ra-name', S.me.name); return true;
 }
 function doJoin() { if (needName()) joinRoom($('#code').value); }
@@ -755,6 +760,7 @@ function renderLobby() {
       const on = st.multi ? set[st.k].includes(v) : set[st.k] === v;
       return `<button class="chip ${on ? 'on' : ''}" ${host ? `data-act="set" data-k="${st.k}" data-v="${esc(JSON.stringify(v))}"` : 'disabled'}>${esc(lab)}</button>`;
     }).join('')}</div></div>`).join('')}
+    ${g.est ? `<p class="muted" style="margin:10px 0 0;font-weight:600">Durée estimée : environ ${Math.max(1, Math.round(g.est(set, Math.max(online, g.min))))} min avec ${online} joueur${online > 1 ? 's' : ''}</p>` : ''}
     ${online < g.min ? `<p class="err">Il faut au moins ${g.min} joueurs connectés.</p>` : ''}`;
 }
 
@@ -1189,7 +1195,43 @@ const BAC_CATS = ['Prénom','Pays','Ville','Animal','Fruit ou légume','Métier'
 const BAC_DEF = ['Prénom','Pays','Animal','Fruit ou légume','Métier','Objet'];
 const BAC_LETTERS = 'ABCDEFGHIJLMNOPRSTV';
 
-const SYL = {"facile":["er","ra","on","es","nt","en","re","ai","is","as","ie","se","ss","te","ent","ns","de","ri","era","ons","ass","ez","ro","an","rai","le","io","at","ti","in","ion","it","la","sse","ou","me","ta","sa","si","co","li","ne","ar","il","ch","ll","ur","iez","tr","al","na","ec","em","et","nn","ron","ca","ere","eri","ter","qu","ien","ssi","ue","ais","ma","or","ge","onn","pa","st","am","ait","el","aie","ill","ant","ser","ni","ero","ee","di","pe","lo","ir","nc","tes","ise","ac","ras","ha","ren","ler","ner","ul","to","po","he","ve","eu","ui","us","ol","ce","rie","isa","so","iss","fi","ot","nd","ag","ses","ont","ep","lle","pr","sen","que","lis","om","sio","con","mi","ia","ut","ap","nne","ate","ba","bo","sie","ic","mo","mp","ci","mes","nte","ua","if","au","pi"],"moyen":["cha","rio","des","ab","ier","im","tt","su","ati","gr","vi","ame","ig","res","rez","oi","tio","cr","rer","ali","da","men","ris","tra","va","che","ng","ine","br","ea","eg","rd","os","gu","ssa","no","ct","pl","bi","tu","iq","iqu","ev","nna","ees","ff","mb","las","rr","sai","sas","tas","lla","bl","dec","per","cu","our","uer","eme","rt","ite","eb","ga","fe","rs","age","fo","ef","hi","oc","der","iv","do","rec","sc","ran","nas","cl","tre","ina","ad","rc","lai","tai","id","fa","uc","ho","gn","ifi","lu","fr","op","av","ex","ed","tri","go","be","eco","tis","eur","nis","ei","gi","ver","tte","rm","les","ure","ail","pre","bou","ru","her","fl","ph","dr","og","par","nai","ts","ess","rg","int","rat","pp","uil","mm","um","enc","ire","nta","eta","sti","qua","pro","rn","mer","lan","ist","com","vo","use","ira","anc","nf","rem","up","ard","ech","gra","ste","dis","lat","sur","af","nti","sp","ell","ret","rou","ger","ili","ntr","end","son","lon","ett","ari","oui","etr","gea","dep","out","emb","ela","ule","ign","sat","ele","ton","emp","cou","rep","ete","ale","tat","man","mu","nce","ect","ura","ula","ble","san","cc","ud","ten","car","ip","est","nes","ub","eus","min","ute","ote","od","dem","gue","rap","ib","tro","fie","ita","qui","ies","mat"],"difficile":["eti","sso","tur","uv","isi","ond","du","app","ens","ara","and","nv","tie","tan","abl","onc","fer","llo","ers","ous","mar","ndi","cal","uas","acc","lie","rac","tin","oul","bu","aff","cti","inc","ema","nie","pla","urs","ree","lli","ans","all","ene","ime","den","epa","ini","fia","ric","sm","uss","nde","esa","sou","uta","ya","ort","def","oli","arr","rev","pt","eca","ram","ang","ug","ole","nca","eo","un","ive","pos","nge","cla","ins","bil","lit","ota","att","rti","bra","cor","rde","uf","nu","air","cho","lin","deg","ica","lam","ias","oy","tal","ena","fu","tou","iti","mas","ois","emo","edi","ges","omm","ide","rre","eli","eve","ecr","mon","pat","sem","teu","ala","ing","ain","til","rin","art","uri","aq","tiq","cra","lt","aqu","rp","cre","see","tif","ay","can","met","oq","oqu","det","oni","jo","col","rea","ouc","gne","fou","ber","har","uai","nda","ott","uet","gre","och","cas","iso","vis","act","ord","rge","lot","erm","rim","tta","let","sme","ref","reg","mou","uti","gen","ast","for","tel","mpa","ima","das","err","tee","uis","rel","ral","ux","red","tam","esi","ile","atr","cen","ndr","erc","imp","vr","nan","abi","del","cri","mor","ebo","sin","tor","bar","gna","lee","iro","enn","aut","ngu","ven","eng","olo","rra","gri","mis","len","han","ju","ind","has","pas","tiv","ism","ouv","cat","rei"]};
+/* ===================== FILTRE DE LANGAGE (public collège) ===================== */
+const BAD_EXACT = new Set(('con cons conne connes cul culs pd pede pedes bite bites zob zizi zgeg teub teube couille couilles ' +
+  'nique niquer nik niker niquez fdp ntm tg ptn merde merdes putain pute putes salope salopes salopard salopards salaud salauds ' +
+  'chier chie chies chiant chiante chiants chiantes chieur chieuse chiotte chiottes foutre bordel ' +
+  'baise baiser baises baisez baisee baiseur baiseurs baisent ' +
+  'nichon nichons nibard nibards boobs penis vagin sexe sexy sex porn porno viol violer violee viols ' +
+  'caca pipi prout debile debiles abruti abrutie abrutis cretin cretine cretins imbecile imbeciles gogol gogole ' +
+  'mongol mongole triso trisomique attarde attardee attardes boloss bolosse baltringue tocard tocarde ' +
+  'gouine travelo negre negres negro bougnoule bicot youpin nazi nazis hitler kkk ' +
+  'tamere tagueule fuck fck shit bitch dick pussy nigga nigger wtf stfu asshole whore slut cunt').split(' '));
+const BAD_PREFIX = ['encul', 'connard', 'conard', 'connass', 'conass', 'merd', 'emmerd', 'branl', 'couill', 'putain', 'pouffias', 'poufias',
+  'petasse', 'enfoir', 'batard', 'pedophil', 'pornog', 'nazism', 'hitler', 'fuck', 'bitch', 'nigg', 'tarlouz', 'bougnoul', 'youpin', 'niquer', 'niqu'];
+const BAD_JOIN = ['tamere', 'tagueule', 'filsdepute', 'trouducul', 'fdp', 'ntm', 'encul', 'connard', 'putain', 'fuck'];
+function leet(s) { return String(s || '').toLowerCase().replace(/@/g, 'a').replace(/\$/g, 's').replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').replace(/7/g, 't'); }
+function badTok(w) {
+  if (!w) return false;
+  if (BAD_EXACT.has(w)) return true;
+  for (const p of BAD_PREFIX) if (w.startsWith(p)) return true;
+  return false;
+}
+function isRude(text) {
+  const n = norm(leet(text).replace(/pique[\s-]*niqu/g, 'piquenic'));
+  if (!n) return false;
+  const toks = n.split(' ');
+  for (const t of toks) { if (badTok(t) || badTok(t.replace(/(.)\1{2,}/g, '$1')) || badTok(t.replace(/(.)\1{2,}/g, '$1$1'))) return true; }
+  /* mots coupés : "ta mere", "fils de pute" */
+  for (let i = 0; i < toks.length - 1; i++) {
+    const j2 = toks[i] + toks[i + 1], j3 = j2 + (toks[i + 2] || '');
+    for (const s of BAD_JOIN) if (j2.startsWith(s) || j3.startsWith(s)) return true;
+  }
+  /* lettres espacées : "c o n n a r d" */
+  const singles = n.replace(/\b([a-z]) (?=[a-z]\b)/g, '$1');
+  if (singles !== n && singles.split(' ').some(badTok)) return true;
+  return false;
+}
+
+const SYL = {"facile":["er","ra","on","es","nt","en","re","ai","is","as","ie","se","te","ent","ns","de","ri","era","ons","ass","ez","ro","an","rai","le","io","at","ti","in","ion","it","la","sse","ou","me","ta","sa","si","co","li","ne","ar","il","ch","ll","ur","iez","tr","al","na","ec","em","et","nn","ron","ca","ere","eri","ter","qu","ien","ssi","ue","ais","ma","or","ge","onn","pa","st","am","ait","el","aie","ill","ant","ser","ni","ero","ee","di","pe","lo","ir","nc","tes","ise","ac","ras","ha","ren","ler","ner","ul","to","po","he","ve","eu","ui","us","ol","ce","rie","isa","so","iss","fi","ot","nd","ag","ses","ont","ep","lle","pr","sen","que","lis","om","sio","mi","ia","ut","ap","nne","ate","ba","bo","sie","ic","mo","mp","ci","mes","nte","ua","if","au","pi"],"moyen":["cha","rio","des","ab","ier","im","tt","su","ati","gr","vi","ame","ig","res","rez","oi","tio","cr","rer","ali","da","men","ris","tra","va","che","ng","ine","br","ea","eg","rd","os","gu","ssa","no","ct","pl","bi","tu","iq","iqu","ev","nna","ees","ff","mb","las","rr","sai","sas","tas","lla","bl","dec","per","our","uer","eme","rt","ite","eb","ga","fe","rs","age","fo","ef","hi","oc","der","iv","do","rec","sc","ran","nas","cl","tre","ina","ad","rc","lai","tai","id","fa","uc","ho","gn","ifi","lu","fr","op","av","ex","ed","tri","go","be","eco","tis","eur","nis","ei","gi","ver","tte","rm","les","ure","ail","pre","bou","ru","her","fl","ph","dr","og","par","nai","ts","ess","rg","int","rat","pp","uil","mm","um","enc","ire","nta","eta","sti","qua","pro","rn","mer","lan","ist","com","vo","use","ira","anc","nf","rem","up","ard","ech","gra","ste","dis","lat","sur","af","nti","sp","ell","ret","rou","ger","ili","ntr","end","son","lon","ett","ari","oui","etr","gea","dep","out","emb","ela","ule","ign","sat","ele","ton","emp","cou","rep","ete","ale","tat","man","mu","nce","ect","ura","ula","ble","san","cc","ud","ten","car","ip","est","nes","ub","eus","min","ute","ote","od","dem","gue","rap","ib","tro","fie","ita","qui","ies","mat","cer"],"difficile":["eti","sso","tur","uv","isi","ond","du","app","ens","ara","and","nv","tie","tan","abl","onc","fer","llo","ers","ous","mar","ndi","cal","uas","acc","lie","rac","tin","oul","bu","aff","cti","inc","ema","nie","pla","urs","ree","lli","ans","all","ene","ime","den","epa","ini","fia","ric","sm","uss","nde","esa","sou","uta","ya","ort","def","oli","arr","rev","pt","eca","ram","ang","ug","ole","nca","eo","un","ive","pos","nge","cla","ins","bil","lit","ota","att","rti","bra","cor","rde","uf","nu","air","cho","lin","deg","ica","lam","ias","oy","tal","ena","fu","tou","iti","mas","ois","emo","edi","ges","omm","ide","rre","eli","eve","ecr","mon","pat","sem","teu","ala","ing","ain","til","rin","art","uri","aq","tiq","cra","lt","aqu","rp","cre","see","tif","ay","can","met","oq","oqu","det","oni","jo","col","rea","ouc","gne","fou","ber","har","uai","nda","ott","uet","gre","och","cas","iso","vis","act","ord","rge","lot","erm","rim","tta","let","sme","ref","reg","mou","uti","gen","ast","for","tel","mpa","ima","das","err","tee","uis","rel","ral","ux","red","tam","esi","ile","atr","cen","ndr","erc","imp","vr","nan","abi","del","cri","mor","ebo","sin","tor","bar","gna","lee","iro","enn","aut","ngu","ven","eng","olo","rra","gri","mis","len","han","ju","ind","has","pas","tiv","ism","ouv","cat","rei"]};
 /* ===================== JEUX ===================== */
 const GAMES = {};
 const isHex = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
@@ -1203,20 +1245,24 @@ GAMES.croquis = {
   desc: 'Un joueur dessine, les autres devinent le mot.',
   rules: 'Chacun dessine à tour de rôle. Tape le mot dans le chat : plus tu trouves vite, plus tu marques.',
   settings: [
+    { k: 'max', label: 'Dessinateurs', opts: [['all', 'Tout le monde'], [5, '5 au hasard'], [8, '8 au hasard'], [10, '10 au hasard']], def: 'all' },
     { k: 'rounds', label: 'Tours', opts: [[1, '1'], [2, '2'], [3, '3']], def: 1 },
     { k: 'time', label: 'Temps de dessin', opts: [[60, '60 s'], [80, '80 s'], [100, '100 s'], [120, '120 s']], def: 80 },
     { k: 'theme', label: 'Mots', opts: [['mix', 'Mélange'], ['classique', 'Classiques'], ['techno', 'Techno']], def: 'mix' }
   ],
   create(ids, set, ctx) {
     const pool = set.theme === 'techno' ? WORDS_TECHNO : set.theme === 'classique' ? WORDS_CLASSIQUE : WORDS_CLASSIQUE.concat(WORDS_TECHNO);
-    const gs = { ids: ids.slice(), order: ids.slice(), set, pool: shuffle(pool), round: 1, ti: -1, t: 0, scores: Object.fromEntries(ids.map(i => [i, 0])), chat: [], mid: 0, ops: [], byId: {} };
+    const gs = { ids: ids.slice(), order: ids.slice(), set, pool: shuffle(pool), round: 1, ti: -1, t: 0, scores: Object.fromEntries(ids.map(i => [i, 0])), chat: [], mid: 0, ops: [], byId: {}, lastMsg: {},
+      turnsMax: set.max === 'all' ? Infinity : set.max };
     this.next(gs, ctx);
     return gs;
   },
+  est(set, n) { const d = Math.min(n * set.rounds, set.max === 'all' ? 999 : set.max); return d * (set.time * 0.85 + 17) / 60; },
   draw3(gs) { const out = []; while (out.length < 3) { if (!gs.pool.length) gs.pool = shuffle(WORDS_CLASSIQUE); const w = gs.pool.pop(); if (!out.includes(w)) out.push(w); } return out; },
-  sys(gs, x, k = 's', vis = 'all', f = null) { gs.chat.push({ i: ++gs.mid, k, x, vis, f }); if (gs.chat.length > 80) gs.chat.shift(); },
+  sys(gs, x, k = 's', vis = 'all', f = null) { gs.chat.push({ i: ++gs.mid, k, x, vis, f }); if (gs.chat.length > 160) gs.chat.shift(); },
   next(gs, ctx) {
     let found = false;
+    if (gs.t >= gs.turnsMax) { ctx.finish(gs, gs.scores); return; }
     for (let g = 0; g < 200; g++) {
       gs.ti++;
       if (gs.ti >= gs.order.length) { gs.ti = 0; gs.round++; }
@@ -1224,7 +1270,7 @@ GAMES.croquis = {
       if (ctx.on(gs.order[gs.ti])) { found = true; break; }
     }
     if (!found) { ctx.finish(gs, gs.scores); return; }
-    gs.t++; gs.drawer = gs.order[gs.ti]; gs.choices = this.draw3(gs); gs.phase = 'choose';
+    gs.t++; gs.skipped = false; gs.drawer = gs.order[gs.ti]; gs.choices = this.draw3(gs); gs.phase = 'choose';
     gs.end = Date.now() + 12000; gs.dur = 12000; gs.word = null; gs.ops = []; gs.byId = {}; gs.guessed = {}; gs.turnPts = {}; gs.revealed = []; gs.hints = [];
     ctx.ev({ k: 'ops', ops: [] });
     this.sys(gs, ctx.name(gs.drawer) + ' choisit un mot.');
@@ -1239,9 +1285,15 @@ GAMES.croquis = {
     this.sys(gs, ctx.name(gs.drawer) + ' dessine !');
   },
   mask(gs) { return [...gs.word].map((c, j) => /[a-zà-ÿœæ0-9]/i.test(c) ? (gs.revealed.includes(j) ? c : '_') : c).join(''); },
-  endTurn(gs, ctx) {
+  endTurn(gs, ctx, skipped) {
     gs.phase = 'reveal'; gs.dur = 5000; gs.end = Date.now() + gs.dur;
-    this.sys(gs, 'Le mot était : ' + gs.word, 'ok');
+    const elig = gs.ids.filter(id => id !== gs.drawer && (ctx.on(id) || gs.guessed[id] != null)).length;
+    const nf = Object.keys(gs.guessed).length;
+    const dp = skipped ? 0 : Math.round(300 * nf / Math.max(1, elig));
+    if (dp) { gs.scores[gs.drawer] = (gs.scores[gs.drawer] || 0) + dp; gs.turnPts[gs.drawer] = dp; }
+    gs.skipped = !!skipped;
+    if (skipped) { gs.ops = []; gs.byId = {}; ctx.ev({ k: 'ops', ops: [] }); this.sys(gs, 'L\u2019hôte a passé ce tour.'); }
+    if (gs.word) this.sys(gs, 'Le mot était : ' + gs.word, 'ok');
   },
   action(gs, pid, a, ctx) {
     const dr = pid === gs.drawer;
@@ -1261,8 +1313,11 @@ GAMES.croquis = {
       }
       case 'undo': if (dr && gs.phase === 'draw' && gs.ops.length) { const o = gs.ops.pop(); if (o.id) delete gs.byId[o.id]; ctx.ev({ k: 'ops', ops: gs.ops }, pid); } break;
       case 'clear': if (dr && gs.phase === 'draw') { gs.ops = []; gs.byId = {}; ctx.ev({ k: 'ops', ops: [] }, pid); } break;
+      case 'skip': if (ctx.isHost(pid) && (gs.phase === 'choose' || gs.phase === 'draw')) this.endTurn(gs, ctx, true); break;
       case 'msg': {
         const x = String(a.x || '').trim().slice(0, 80); if (!x) return;
+        const now = Date.now(); if (now - (gs.lastMsg[pid] || 0) < 600) return; gs.lastMsg[pid] = now;
+        if (isRude(x)) { this.sys(gs, 'Message bloqué : reste correct.', 'near', pid); return; }
         if (gs.phase === 'draw') {
           if (dr) return;
           if (gs.guessed[pid] != null) { this.sys(gs, x, 'g', 'g', pid); return; }
@@ -1272,7 +1327,6 @@ GAMES.croquis = {
             const first = Object.keys(gs.guessed).length === 0;
             const pts = Math.round(100 + 300 * rem) + (first ? 50 : 0);
             gs.guessed[pid] = pts; gs.scores[pid] = (gs.scores[pid] || 0) + pts; gs.turnPts[pid] = pts;
-            gs.scores[gs.drawer] = (gs.scores[gs.drawer] || 0) + 50; gs.turnPts[gs.drawer] = (gs.turnPts[gs.drawer] || 0) + 50;
             this.sys(gs, ctx.name(pid) + ' a trouvé !', 'ok');
             ctx.to(pid, { k: 'found' });
             const need = ctx.online(gs.ids).filter(id => id !== gs.drawer);
@@ -1304,7 +1358,7 @@ GAMES.croquis = {
     const dr = pid === gs.drawer, found = gs.guessed[pid] != null;
     const show = gs.word && (gs.phase === 'reveal' || dr || found);
     return {
-      phase: gs.phase, t: gs.t, round: Math.min(gs.round, gs.set.rounds), rounds: gs.set.rounds, drawer: gs.drawer, me: dr, found,
+      phase: gs.phase, skipped: !!gs.skipped, t: gs.t, maxT: gs.turnsMax === Infinity ? 0 : gs.turnsMax, round: Math.min(gs.round, gs.set.rounds), rounds: gs.set.rounds, drawer: gs.drawer, me: dr, found,
       choices: dr && gs.phase === 'choose' ? gs.choices : null,
       word: show ? gs.word : null, mask: gs.word && !show ? this.mask(gs) : null,
       end: gs.end, dur: gs.dur, guessed: Object.keys(gs.guessed), scores: gs.scores, turnPts: gs.phase === 'reveal' ? gs.turnPts : null,
@@ -1321,13 +1375,13 @@ GAMES.croquis = {
   },
   render(v) {
     scr('cq-' + v.t, `
-      <div class="ghead"><span class="tag" id="cqRound"></span><div class="mask" id="cqMask"></div>${timerEl()}</div>
+      <div class="ghead"><span class="tag" id="cqRound"></span><div class="mask" id="cqMask"></div>${hostBtn('cq-skip', 'Passer le tour', 'small')}${timerEl()}</div>
       <div class="layout2">
         <div><div class="boardwrap" id="cqBoard"><div class="overlay" id="cqOver" hidden></div></div><div class="tools" id="cqTools" hidden></div></div>
         <aside class="col">
           <div class="chat"><div class="msgs" id="cqMsgs" aria-live="polite"></div>
             <form id="cqForm"><input id="cqIn" maxlength="80" autocomplete="off" placeholder="Ta proposition…"><button type="submit">Envoyer</button></form></div>
-          <div class="card" style="padding:10px"><div class="plist" id="cqPlayers"></div></div>
+          <div class="card" style="padding:10px"><div class="plist compact" id="cqPlayers"></div></div>
         </aside>
       </div>`, st => {
       Board.get().mount($('#cqBoard'));
@@ -1338,7 +1392,7 @@ GAMES.croquis = {
     b.edit = v.me && v.phase === 'draw'; b.send = b.edit ? m => act(m) : null; S.activeBoard = b;
     const tools = $('#cqTools');
     if (b.edit) { if (tools.hidden || !tools.firstElementChild) tools.innerHTML = toolsHTML(b); tools.hidden = false; } else tools.hidden = true;
-    $('#cqRound').textContent = `Tour ${v.round}/${v.rounds}`;
+    $('#cqRound').textContent = v.maxT ? `Dessin ${v.t}/${v.maxT}` : `Tour ${v.round}/${v.rounds}`;
     const mk = $('#cqMask');
     const mtxt = v.word ? v.word : v.mask ? v.mask.replace(/ /g, '  ') : '';
     const mcount = v.mask ? [...v.mask].filter(c => c === '_' || /[a-zà-ÿ]/i.test(c)).length : 0;
@@ -1351,7 +1405,7 @@ GAMES.croquis = {
     } else if (v.phase === 'reveal') {
       const tp = Object.entries(v.turnPts || {}).sort((a, b) => b[1] - a[1]);
       ok += tp.length;
-      oh = `<div><p class="label" style="color:#fff">Le mot était</p><h3 style="font-size:2.2rem">${esc(v.word)}</h3><div class="col" style="gap:4px;margin-top:12px">${tp.length ? tp.map(([id, p]) => `<div>${pnm(id)} <b>+${p}</b></div>`).join('') : '<div>Personne n’a trouvé.</div>'}</div></div>`;
+      oh = v.skipped ? `<div><h3>Tour passé par l’hôte</h3>${v.word ? `<p>Le mot était <b>${esc(v.word)}</b></p>` : ''}</div>` : `<div><p class="label" style="color:#fff">Le mot était</p><h3 style="font-size:2.2rem">${esc(v.word)}</h3><div class="col" style="gap:4px;margin-top:12px">${tp.length ? tp.map(([id, p]) => `<div>${pnm(id)} <b>+${p}</b></div>`).join('') : '<div>Personne n’a trouvé.</div>'}</div></div>`;
     }
     if (ov.dataset.k !== ok) { ov.dataset.k = ok; ov.innerHTML = oh; }
     ov.hidden = !oh;
@@ -1368,7 +1422,7 @@ GAMES.croquis = {
     inp.disabled = dis;
     inp.placeholder = dis ? 'Tu dessines : pas de chat !' : v.found ? 'Trouvé ! Discute avec les gagnants…' : 'Ta proposition…';
   },
-  click(a, b) { if (a === 'cq-pick') act({ a: 'pick', i: +b.dataset.i }); }
+  click(a, b) { if (a === 'cq-pick') act({ a: 'pick', i: +b.dataset.i }); else if (a === 'cq-skip') act({ a: 'skip' }); }
 };
 
 /* ---------- 2. GRIBOUILLIS EN CHAÎNE ---------- */
@@ -1388,6 +1442,7 @@ GAMES.chaine = {
     this.startStep(gs, ctx);
     return gs;
   },
+  est(set, n) { const K = Math.min(n, set.steps); let s = 0; for (let k = 0; k < K; k++) s += (this.typeOf(k) === 'draw' ? set.tdraw : set.ttext) * 0.85 + 3; return (s + n * 12) / 60; },
   typeOf(k) { return k === 0 ? 'write' : k % 2 === 1 ? 'draw' : 'desc'; },
   albumOf(gs, pid, k) { const p = gs.ids.indexOf(pid); return ((p - k) % gs.n + gs.n) % gs.n; },
   startStep(gs, ctx) {
@@ -1423,17 +1478,23 @@ GAMES.chaine = {
     if (['write', 'draw', 'desc'].includes(gs.phase)) {
       if (a.a === 'sub') {
         if (gs.phase === 'draw') { if (typeof a.x === 'string' && a.x.startsWith('data:image/jpeg;base64,') && a.x.length < 600000) gs.subs[pid] = { type: 'img', data: a.x }; }
-        else { const x = String(a.x || '').trim().slice(0, 100); gs.subs[pid] = { type: 'text', data: x || (gs.step === 0 ? pick(STARTERS) : '(pas de réponse)') }; }
+        else { let x = String(a.x || '').trim().slice(0, 100); if (isRude(x)) x = '(texte masqué)'; gs.subs[pid] = { type: 'text', data: x || (gs.step === 0 ? pick(STARTERS) : '(pas de réponse)') }; }
       } else if (a.a === 'unsub' && Date.now() < gs.end) delete gs.subs[pid];
       else if (a.a === 'need') this.sendPrompt(gs, pid, ctx);
     } else if (gs.phase === 'reveal') {
       if (a.a === 'need') this.sendRev(gs, pid, ctx);
+      else if (a.a === 'hide' && ctx.isHost(pid)) {
+        const al = gs.albums[gs.ra], i = a.i | 0;
+        if (al.e[i] && i < gs.shown) { al.e[i] = { pid: al.e[i].pid, type: 'text', data: '(masqué par l’hôte)' }; ctx.ev({ k: 'rev', key: gs.ra + ':' + i, e: al.e[i], re: 1 }); }
+      }
+      else if (a.a === 'all' && ctx.isHost(pid)) { const al = gs.albums[gs.ra]; while (gs.shown < al.e.length) this.reveal(gs, ctx); }
       else if (a.a === 'next' && ctx.isHost(pid)) {
         const al = gs.albums[gs.ra];
         if (gs.shown < al.e.length) this.reveal(gs, ctx);
         else if (gs.ra < gs.n - 1) { gs.ra++; gs.shown = 0; this.reveal(gs, ctx); }
         else { gs.endNote = 'Toutes les chaînes ont été dévoilées. Bravo les artistes !'; ctx.finish(gs, {}); }
       }
+      else if (a.a === 'end' && ctx.isHost(pid)) { gs.endNote = 'Bravo les artistes !'; ctx.finish(gs, {}); }
     }
   },
   tick(gs, now, ctx) {
@@ -1454,7 +1515,7 @@ GAMES.chaine = {
   },
   onEv(e) {
     if (e.k === 'prompt') { S.cache['p:' + e.key] = e; render(); }
-    else if (e.k === 'rev') { S.cache['r:' + e.key] = e.e; render(); }
+    else if (e.k === 'rev') { S.cache['r:' + e.key] = e.e; if (e.re) { const [ra, i] = e.key.split(':'); const n = $(`#chAlbum [data-i="${i}"]`); if (n && S.gv && String(S.gv.ra) === ra) n.remove(); } render(); }
   },
   media(type, data) {
     if (type === 'img') return data && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(data) ? `<img src="${data}" alt="Dessin">` : '<span class="muted">(dessin vide)</span>';
@@ -1495,7 +1556,11 @@ GAMES.chaine = {
     if (v.sub && !auto) { act({ a: 'unsub' }); return; }
     if (v.sub) return;
     if (v.phase === 'draw') { if (S.chBoard) { S.chBoard.edit = false; act({ a: 'sub', x: S.chBoard.img() }); } }
-    else { const i = $('#chIn'); act({ a: 'sub', x: i ? i.value : '' }); }
+    else {
+      const i = $('#chIn'), x = i ? i.value : '';
+      if (!auto && isRude(x)) { toast('Ce texte n’est pas accepté. Reformule.'); sfx.bad(); return; }
+      act({ a: 'sub', x });
+    }
   },
   renderReveal(v) {
     scr('ch-rev-' + v.ra, `
@@ -1509,19 +1574,22 @@ GAMES.chaine = {
       const e = S.cache['r:' + v.ra + ':' + i];
       if (!e) { missing = true; continue; }
       const d = document.createElement('div'); d.className = 'entry pop'; d.dataset.i = i;
-      d.innerHTML = `${avatar(pl(e.pid))}<div class="bub"><div class="muted" style="font-size:.8rem;font-weight:600">${pnm(e.pid)}${e.type === 'img' ? ' a dessiné' : ' a écrit'}</div>${this.media(e.type, e.data)}</div>`;
+      d.innerHTML = `${avatar(pl(e.pid))}${isHost() ? `<button class="btn small ghost" data-act="ch-hide" data-i="${i}" style="order:3">Masquer</button>` : ''}<div class="bub"><div class="muted" style="font-size:.8rem;font-weight:600">${pnm(e.pid)}${e.type === 'img' ? ' a dessiné' : ' a écrit'}</div>${this.media(e.type, e.data)}</div>`;
       const after = [...al.children].find(c => +c.dataset.i > i);
       al.insertBefore(d, after || null);
       d.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
     if (missing && !al.dataset.asked) { al.dataset.asked = 1; act({ a: 'need' }); }
     const lastAlbum = v.ra >= v.n - 1, done = v.shown >= v.len;
-    $('#chNav').innerHTML = isHost() ? `<button class="btn go big" data-act="ch-next">${!done ? 'Suivant' : lastAlbum ? 'Terminer' : 'Chaîne suivante'}</button>` : '<span class="muted">L’hôte fait défiler les chaînes.</span>';
+    $('#chNav').innerHTML = isHost() ? `<button class="btn go big" data-act="ch-next">${!done ? 'Suivant' : lastAlbum ? 'Terminer' : 'Chaîne suivante'}</button>${!done ? '<button class="btn" data-act="ch-all">Tout afficher</button>' : ''}<button class="btn ghost" data-act="ch-end">Finir maintenant</button>` : '<span class="muted">L’hôte fait défiler les chaînes.</span>';
   },
-  click(a) {
+  click(a, b) {
     if (a === 'ch-sub') this.submit();
     else if (a === 'ch-idea') { const i = $('#chIn'); if (i && !i.disabled) i.value = pick(STARTERS); }
     else if (a === 'ch-next') act({ a: 'next' });
+    else if (a === 'ch-all') act({ a: 'all' });
+    else if (a === 'ch-hide') act({ a: 'hide', i: +b.dataset.i });
+    else if (a === 'ch-end') act({ a: 'end' });
   }
 };
 
@@ -1566,20 +1634,22 @@ GAMES.bombe = {
     return gs;
   },
   begin(gs) { gs.cur = gs.order[0]; this.newSyl(gs); gs.bombEnd = Date.now() + this.fuse(gs) + 1500; gs.phase = 'play'; gs.t++; },
+  est(set, n) { return (n * set.lives * 13 + 20) / 60; },
   fuse(gs) { const [a, b] = { courte: [6, 11], normale: [9, 17], longue: [13, 24] }[gs.set.fuse]; return (a + Math.random() * (b - a)) * 1000; },
   newSyl(gs) { const L = SYL[gs.set.diff]; let s; do s = pick(L); while (s === gs.syl && L.length > 1); gs.syl = s; },
   nextAlive(gs, from) { const o = gs.order; const i = o.indexOf(from); for (let k = 1; k <= o.length; k++) { const id = o[(i + k) % o.length]; if (gs.alive[id]) return id; } return null; },
   action(gs, pid, a, ctx) {
     if (gs.phase !== 'play' || pid !== gs.cur) return;
-    if (a.a === 'ty') { ctx.ev({ k: 'ty', id: pid, x: String(a.x || '').slice(0, 30) }, pid); return; }
+    if (a.a === 'ty') { const t = String(a.x || '').slice(0, 30); ctx.ev({ k: 'ty', id: pid, x: isRude(t) ? '***' : t }, pid); return; }
     if (a.a !== 'w') return;
     const raw = String(a.x || '').trim().slice(0, 40), x = letters(raw);
     let why = '';
     if (!x) return;
-    if (!x.includes(gs.syl)) why = 'Il manque « ' + gs.syl.toUpperCase() + ' ».';
+    if (isRude(raw)) why = 'Mot refusé.';
+    else if (!x.includes(gs.syl)) why = 'Il manque « ' + gs.syl.toUpperCase() + ' ».';
     else if (!Dict.set.has(x)) why = '« ' + raw + ' » n’est pas dans le dictionnaire.';
     else if (gs.used.has(x)) why = 'Déjà utilisé !';
-    if (why) { ctx.to(pid, { k: 'bad', why }); ctx.ev({ k: 'ty', id: pid, x: raw }, pid); return; }
+    if (why) { ctx.to(pid, { k: 'bad', why }); ctx.ev({ k: 'ty', id: pid, x: isRude(raw) ? '***' : raw }, pid); return; }
     gs.used.add(x);
     gs.scores[pid] += 10;
     let L = gs.lets[pid];
@@ -1705,6 +1775,7 @@ GAMES.quiz = {
     { k: 'time', label: 'Temps', opts: [[10, '10 s'], [15, '15 s'], [20, '20 s']], def: 15 },
     { k: 'cats', label: 'Thèmes', multi: true, min: 1, opts: Object.entries(QUIZ_CATS), def: Object.keys(QUIZ_CATS) }
   ],
+  est(set) { return set.count * (set.time * 0.7 + 8) / 60; },
   create(ids, set, ctx) {
     let pool = QUIZ.filter(q => set.cats.includes(q[0])); if (!pool.length) pool = QUIZ;
     const qs = shuffle(pool).slice(0, set.count).map(q => { const ch = shuffle([q[2], q[3], q[4], q[5]]); return { cat: q[0], q: q[1], ch, ok: ch.indexOf(q[2]) }; });
@@ -1775,6 +1846,7 @@ GAMES.bac = {
     const gs = { ids: ids.slice(), set, cats, round: 0, scores: Object.fromEntries(ids.map(i => [i, 0])), usedL: [] };
     this.startRound(gs); return gs;
   },
+  est(set) { return set.rounds * (set.time * 0.9 + set.cats.length * 30 + 20) / 60; },
   startRound(gs) {
     gs.round++;
     const L = [...BAC_LETTERS].filter(l => !gs.usedL.includes(l)); gs.letter = pick(L.length ? L : [...BAC_LETTERS]); gs.usedL.push(gs.letter);
@@ -1807,7 +1879,7 @@ GAMES.bac = {
     gs.phase = 'scores'; gs.end = null;
   },
   action(gs, pid, a, ctx) {
-    if (a.a === 'ans' && (gs.phase === 'play' || gs.phase === 'collect') && Array.isArray(a.v)) gs.ans[pid] = gs.cats.map((_, i) => String(a.v[i] || '').slice(0, 40));
+    if (a.a === 'ans' && (gs.phase === 'play' || gs.phase === 'collect') && Array.isArray(a.v)) gs.ans[pid] = gs.cats.map((_, i) => { const x = String(a.v[i] || '').slice(0, 40); return isRude(x) ? '' : x; });
     else if (a.a === 'stop' && gs.phase === 'play' && !gs.stopBy) {
       const v = gs.ans[pid] || [];
       if (gs.cats.every((_, i) => this.valid(gs, v[i] || ''))) { gs.stopBy = pid; gs.end = Math.min(gs.end, Date.now() + 5000); }
@@ -1902,11 +1974,12 @@ GAMES.imposteur = {
   settings: [
     { k: 'tclue', label: 'Temps d’indice', opts: [[30, '30 s'], [45, '45 s'], [60, '60 s']], def: 45 },
     { k: 'tvote', label: 'Temps de vote', opts: [[30, '30 s'], [45, '45 s'], [60, '60 s']], def: 45 },
-    { k: 'imp', label: 'Imposteurs', opts: [['auto', 'Auto'], [1, '1'], [2, '2'], [3, '3']], def: 'auto' }
+    { k: 'imp', label: 'Imposteurs', opts: [['auto', 'Auto'], [1, '1'], [2, '2'], [3, '3']], def: 'auto' },
+    { k: 'maxr', label: 'Tours max', opts: [[3, '3'], [4, '4'], [5, '5'], [6, '6']], def: 4 }
   ],
   create(ids, set, ctx) {
     const n = ids.length;
-    let ni = set.imp === 'auto' ? (n >= 10 ? 2 : 1) : set.imp;
+    let ni = set.imp === 'auto' ? (n >= 8 ? 2 : 1) : set.imp;
     ni = Math.max(1, Math.min(ni, Math.floor((n - 1) / 2)));
     let [w1, w2] = pick(PAIRS); if (Math.random() < .5) [w1, w2] = [w2, w1];
     const imp = shuffle(ids).slice(0, ni);
@@ -1914,12 +1987,14 @@ GAMES.imposteur = {
     ids.forEach(id => { gs.words[id] = gs.imp[id] ? w2 : w1; gs.alive[id] = true; gs.clues[id] = []; });
     this.startClue(gs); return gs;
   },
+  est(set) { return set.maxr * (set.tclue + set.tvote + 6) * 0.8 / 60; },
   startClue(gs) { gs.phase = 'clue'; gs.cur = {}; gs.dur = gs.set.tclue * 1000; gs.end = Date.now() + gs.dur; },
   aliveOn(gs, ctx) { return gs.ids.filter(id => gs.alive[id] && ctx.on(id)); },
   action(gs, pid, a, ctx) {
     if (!gs.alive[pid]) return;
     if (a.a === 'clue' && gs.phase === 'clue') {
       const x = String(a.x || '').trim().slice(0, 24); if (!x) return;
+      if (isRude(x)) { ctx.to(pid, { k: 'bad', why: 'Indice refusé : reste correct.' }); return; }
       const lx = letters(x), lw = letters(gs.words[pid]);
       if (lx.includes(lw) || (lx.length >= 3 && lw.includes(lx))) { ctx.to(pid, { k: 'bad', why: 'Ton indice ne doit pas contenir ton mot.' }); return; }
       gs.cur[pid] = x;
@@ -1938,7 +2013,7 @@ GAMES.imposteur = {
     const al = gs.ids.filter(id => gs.alive[id]);
     const ni = al.filter(id => gs.imp[id]).length, nc = al.length - ni;
     let win = null;
-    if (ni === 0) win = 'civ'; else if (ni >= nc || gs.round >= gs.ids.length) win = 'imp';
+    if (ni === 0) win = 'civ'; else if (ni >= nc || gs.round >= gs.set.maxr) win = 'imp';
     if (!win) { gs.round++; this.startClue(gs); return; }
     const sc = Object.fromEntries(gs.ids.map(id => [id, 0]));
     gs.ids.forEach(id => { if (win === 'civ' && !gs.imp[id]) sc[id] = 300; if (win === 'imp' && gs.imp[id]) sc[id] = 500; });
@@ -1958,7 +2033,7 @@ GAMES.imposteur = {
   },
   view(gs, pid, ctx) {
     const al = this.aliveOn(gs, ctx);
-    const v = { phase: gs.phase, round: gs.round, word: gs.words[pid], meAlive: !!gs.alive[pid], end: gs.end, dur: gs.dur,
+    const v = { phase: gs.phase, round: gs.round, maxr: gs.set.maxr, nimp: Object.keys(gs.imp).length, word: gs.words[pid], meAlive: !!gs.alive[pid], end: gs.end, dur: gs.dur,
       players: gs.ids.map(id => ({ id, a: !!gs.alive[id], c: gs.clues[id] })) };
     if (gs.phase === 'clue') { v.myClue = gs.cur[pid] || null; v.n = al.filter(id => gs.cur[id]).length; v.total = al.length; }
     if (gs.phase === 'vote') { v.myVote = gs.votes[pid] || null; v.n = al.filter(id => gs.votes[id]).length; v.total = al.length; }
@@ -1968,9 +2043,9 @@ GAMES.imposteur = {
   onEv(e) { if (e.k === 'bad') { sfx.bad(); toast(e.why); } },
   render(v) {
     scr('imp-' + v.round + v.phase, `
-      <div class="ghead"><span class="tag">Tour ${v.round}</span><h2 class="grow">${{ clue: 'Donne un indice', vote: 'Qui est l’imposteur ?', out: 'Verdict' }[v.phase]}</h2>${v.phase !== 'out' ? timerEl() : ''}</div>
+      <div class="ghead"><span class="tag">Tour ${v.round}/${v.maxr}</span><h2 class="grow">${{ clue: 'Donne un indice', vote: 'Qui est l’imposteur ?', out: 'Verdict' }[v.phase]}</h2>${v.phase !== 'out' ? timerEl() : ''}</div>
       <div class="center" style="margin:6px 0 4px"><span class="label">Ton mot secret</span><br><span class="myword">${esc(v.word)}</span></div>
-      <p class="center muted" style="margin:10px 0 16px">Tu ne sais pas si tu es l’imposteur.</p>
+      <p class="center muted" style="margin:10px 0 16px">Tu ne sais pas si tu es l’imposteur. ${v.nimp > 1 ? v.nimp + ' imposteurs cette partie.' : '1 imposteur cette partie.'}</p>
       <div id="impZone" style="max-width:640px;margin:0 auto 16px"></div>
       <div class="vlist" id="impList"></div>`);
     const z = $('#impZone');
@@ -2013,6 +2088,7 @@ GAMES.estim = {
     const gs = { ids: ids.slice(), set, qs: shuffle(ESTIM).slice(0, set.count), qi: -1, scores: Object.fromEntries(ids.map(i => [i, 0])), ans: {} };
     QA.nextQ(this, gs, ctx); return gs;
   },
+  est(set) { return set.count * (set.time * 0.8 + 9) / 60; },
   score(gs) {
     const A = gs.qs[gs.qi][1];
     const ids = Object.keys(gs.ans);
@@ -2079,6 +2155,7 @@ GAMES.prefs = {
     const gs = { ids: ids.slice(), set, qs, qi: -1, scores: Object.fromEntries(ids.map(i => [i, 0])), ans: {} };
     QA.nextQ(this, gs, ctx); return gs;
   },
+  est(set) { return set.count * (set.time * 0.6 + 8) / 60; },
   score(gs) {
     const a = Object.values(gs.ans).filter(x => x === 0).length, b = Object.values(gs.ans).filter(x => x === 1).length;
     if (a === b) return;
