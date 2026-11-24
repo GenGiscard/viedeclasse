@@ -237,6 +237,18 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .prompt{border:3px solid var(--ink);border-radius:16px;background:#fff;padding:14px;text-align:center;font-family:var(--f-display);font-size:1.6rem;font-weight:800;margin-bottom:12px;overflow-wrap:anywhere}
 .prompt img{max-width:100%;border-radius:10px;border:2px solid var(--ink)}
 
+/* modération hôte */
+#modDock{position:fixed;z-index:40;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:10px;max-width:calc(100vw - 28px)}
+#modPanel{width:min(460px,calc(100vw - 28px));max-height:min(72vh,720px);overflow-y:auto;padding:14px;order:-1}
+.modgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:6px}
+.moditem{border:2px solid var(--ink);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:6px;background:var(--soft);min-width:0}
+.modmedia{background:#fff;border:1.5px solid var(--line-2);border-radius:8px;min-height:44px;display:grid;place-items:center;padding:4px;font-weight:600;overflow-wrap:anywhere;text-align:center}
+.modmedia img{display:block;width:100%;border-radius:6px}
+@media (min-width:1000px){
+  body.modding #stage{margin-right:calc(min(460px,40vw) + 28px);margin-left:0}
+  body.modding #modDock{top:calc(70px + env(safe-area-inset-top,0px))}
+  body.modding #modPanel{width:min(460px,40vw);max-height:calc(100vh - 160px)}
+}
 /* toast / voile */
 #toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:min(92vw,520px)}
 #toast div{background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);animation:pop .3s}
@@ -326,7 +338,7 @@ const S = {
   screenKey: null, cache: {}, homeMsg: ''
 };
 const isHost = () => S.role === 'host';
-const pl = id => (S.lobby && S.lobby.players.find(p => p.id === id)) || { id, name: '?', color: '#8a93b2' };
+const pl = id => (S.lobby && S.lobby.players.find(p => p.id === id)) || { id, name: 'Joueur parti', color: '#8a93b2' };
 const avatar = (p, cls = '') => `<span class="av ${cls}" style="background:${esc(p.color)}" title="${esc(p.name)}">${initials(p.name)}</span>`;
 const pnm = id => esc(pl(id).name);
 
@@ -637,6 +649,8 @@ function scr(key, html, init) {
   return false;
 }
 function render() {
+  const keepMod = isHost() && S.lobby && S.lobby.game === 'chaine' && S.gv && ['write', 'draw', 'desc'].includes(S.gv.phase);
+  if (!keepMod) { const d = document.getElementById('modDock'); if (d) d.remove(); document.body.classList.remove('modding'); }
   if (!S.lobby) { renderHome(); return; }
   if (!$('#stage')) { app.innerHTML = `<header class="bar"><div class="in" id="barin"></div></header><main class="wrap" id="stage"></main>`; S.screenKey = null; }
   renderBar();
@@ -1430,7 +1444,7 @@ const STARTERS = ['Un chat qui fait du ski', 'Le prof de techno sur une fusée',
 GAMES.chaine = {
   name: 'Gribouillis en chaîne', color: '#14a3a3', min: 2,
   desc: 'Phrase, dessin, phrase… et le message déraille.',
-  rules: 'Écris une phrase. Le joueur suivant la dessine, le suivant décrit le dessin… On découvre toutes les chaînes à la fin.',
+  rules: 'Écris une phrase. Le joueur suivant la dessine, le suivant décrit le dessin… On découvre toutes les chaînes à la fin. L’hôte peut refuser un dessin : son auteur doit le refaire.',
   settings: [
     { k: 'steps', label: 'Étapes par chaîne', opts: [[4, '4'], [6, '6'], [8, '8'], [99, 'Tout le monde']], def: 6 },
     { k: 'tdraw', label: 'Temps de dessin', opts: [[60, '60 s'], [90, '90 s'], [120, '120 s']], def: 90 },
@@ -1438,22 +1452,52 @@ GAMES.chaine = {
   ],
   create(ids, set, ctx) {
     const n = ids.length;
-    const gs = { ids: ids.slice(), set, n, K: Math.min(n, set.steps), step: 0, albums: ids.map(id => ({ owner: id, e: [] })), subs: {} };
+    const gs = { ids: ids.slice(), set, n, K: Math.min(n, set.steps), step: 0, albums: ids.map(id => ({ owner: id, e: [] })), subs: {},
+      mod: 0, strikes: {}, refused: {}, pcache: {} };
     this.startStep(gs, ctx);
     return gs;
   },
   est(set, n) { const K = Math.min(n, set.steps); let s = 0; for (let k = 0; k < K; k++) s += (this.typeOf(k) === 'draw' ? set.tdraw : set.ttext) * 0.85 + 3; return (s + n * 12) / 60; },
   typeOf(k) { return k === 0 ? 'write' : k % 2 === 1 ? 'draw' : 'desc'; },
   albumOf(gs, pid, k) { const p = gs.ids.indexOf(pid); return ((p - k) % gs.n + gs.n) % gs.n; },
+  workerOf(gs, a, k) { return gs.ids.find(pid => this.albumOf(gs, pid, k) === a); },
   startStep(gs, ctx) {
     gs.phase = this.typeOf(gs.step);
-    gs.dur = (gs.phase === 'draw' ? gs.set.tdraw : gs.set.ttext) * 1000; gs.end = Date.now() + gs.dur; gs.subs = {};
+    gs.dur = (gs.phase === 'draw' ? gs.set.tdraw : gs.set.ttext) * 1000; gs.end = Date.now() + gs.dur; gs.subs = {}; gs.refused = {};
     if (gs.step > 0) for (const pid of gs.ids) this.sendPrompt(gs, pid, ctx);
   },
+  /* Une entrée est utilisable si elle n'est ni retirée ni vide. */
+  usable(e) { return e && !e.ban && e.data && !(e.type === 'text' && /^\(.*\)$/.test(e.data)); },
+  /* Consigne pour l'album a à l'étape en cours, avec repli si l'étape précédente a été retirée ou est vide. */
+  promptFor(gs, a) {
+    const ck = gs.step + ':' + a;
+    if (gs.pcache[ck]) return gs.pcache[ck];
+    const E = gs.albums[a].e, k = gs.step, prev = E[k - 1];
+    let p = null;
+    if (gs.phase === 'draw') {
+      if (this.usable(prev)) p = { type: 'text', data: prev.data };
+      else {
+        for (let j = k - 2; j >= 0 && !p; j--) if (E[j].type === 'text' && this.usable(E[j])) p = { type: 'text', data: E[j].data, note: 'La phrase précédente a été retirée. Dessine celle-ci.' };
+        if (!p) p = { type: 'text', data: pick(STARTERS), note: 'Nouvelle phrase pour relancer la chaîne.' };
+      }
+    } else {
+      if (this.usable(prev)) p = { type: 'img', data: prev.data };
+      else {
+        const why = prev && prev.ban ? 'Le dessin a été retiré par l’hôte.' : 'Le dessin est resté vide.';
+        for (let j = k - 2; j >= 0 && !p; j--) {
+          if (!this.usable(E[j])) continue;
+          p = E[j].type === 'img' ? { type: 'img', data: E[j].data, note: why + ' Décris plutôt celui-ci.' } : { type: 'text', data: E[j].data, note: why + ' Reformule cette phrase avec tes mots.' };
+        }
+        if (!p) p = { type: 'text', data: pick(STARTERS), note: why + ' Reformule cette phrase avec tes mots.' };
+      }
+    }
+    gs.pcache[ck] = p;
+    return p;
+  },
   sendPrompt(gs, pid, ctx) {
-    if (gs.step === 0 || !['draw', 'desc'].includes(gs.phase)) return;
-    const a = this.albumOf(gs, pid, gs.step), prev = gs.albums[a].e[gs.step - 1];
-    ctx.to(pid, { k: 'prompt', key: gs.step + ':' + a, type: prev.type, data: prev.data });
+    if (gs.step === 0 || !['draw', 'desc'].includes(gs.phase) || !gs.ids.includes(pid)) return;
+    const a = this.albumOf(gs, pid, gs.step), p = this.promptFor(gs, a);
+    ctx.to(pid, { k: 'prompt', key: gs.step + ':' + a, v: gs.mod, type: p.type, data: p.data, note: p.note || '' });
   },
   sendRev(gs, pid, ctx) {
     const al = gs.albums[gs.ra];
@@ -1474,27 +1518,50 @@ GAMES.chaine = {
     const al = gs.albums[gs.ra];
     if (gs.shown < al.e.length) { ctx.ev({ k: 'rev', key: gs.ra + ':' + gs.shown, e: al.e[gs.shown] }); gs.shown++; }
   },
+  /* Retire une étape déjà validée sans casser la chaîne. */
+  ban(gs, a, i, ctx) {
+    const al = gs.albums[a], e = al && al.e[i];
+    if (!e || e.ban) return;
+    if (i === 0 && e.type === 'text') { e.data = pick(STARTERS); e.swapped = 1; }
+    else { e.ban = 1; e.data = null; }
+    gs.mod++;
+    gs.strikes[e.pid] = (gs.strikes[e.pid] || 0) + 1;
+    if (['draw', 'desc'].includes(gs.phase) && i === gs.step - 1) {
+      delete gs.pcache[gs.step + ':' + a];
+      const w = this.workerOf(gs, a, gs.step);
+      if (w) { this.sendPrompt(gs, w, ctx); ctx.to(w, { k: 'newprompt' }); }
+    }
+    if (gs.phase === 'reveal' && a === gs.ra && i < gs.shown) ctx.ev({ k: 'rev', key: a + ':' + i, e, re: 1 });
+  },
   action(gs, pid, a, ctx) {
+    const host = ctx.isHost(pid);
     if (['write', 'draw', 'desc'].includes(gs.phase)) {
       if (a.a === 'sub') {
-        if (gs.phase === 'draw') { if (typeof a.x === 'string' && a.x.startsWith('data:image/jpeg;base64,') && a.x.length < 600000) gs.subs[pid] = { type: 'img', data: a.x }; }
-        else { let x = String(a.x || '').trim().slice(0, 100); if (isRude(x)) x = '(texte masqué)'; gs.subs[pid] = { type: 'text', data: x || (gs.step === 0 ? pick(STARTERS) : '(pas de réponse)') }; }
+        if (gs.phase === 'draw') { if (typeof a.x === 'string' && a.x.startsWith('data:image/jpeg;base64,') && a.x.length < 600000) { gs.subs[pid] = { type: 'img', data: a.x, at: Date.now() }; delete gs.refused[pid]; } }
+        else { let x = String(a.x || '').trim().slice(0, 100); if (isRude(x)) x = '(texte masqué)'; gs.subs[pid] = { type: 'text', data: x || (gs.step === 0 ? pick(STARTERS) : '(pas de réponse)'), at: Date.now() }; delete gs.refused[pid]; }
       } else if (a.a === 'unsub' && Date.now() < gs.end) delete gs.subs[pid];
       else if (a.a === 'need') this.sendPrompt(gs, pid, ctx);
+      else if (a.a === 'refuse' && host) {
+        const id = String(a.id || '');
+        if (!gs.subs[id]) return;
+        delete gs.subs[id];
+        gs.refused[id] = 1;
+        gs.strikes[id] = (gs.strikes[id] || 0) + 1;
+        gs.end = Math.max(gs.end, Date.now() + (gs.phase === 'draw' ? 30000 : 20000));
+        gs.mod++;
+        ctx.to(id, { k: 'refused', type: gs.phase === 'draw' ? 'img' : 'text' });
+      } else if (a.a === 'ban' && host) this.ban(gs, a.al | 0, a.i | 0, ctx);
     } else if (gs.phase === 'reveal') {
       if (a.a === 'need') this.sendRev(gs, pid, ctx);
-      else if (a.a === 'hide' && ctx.isHost(pid)) {
-        const al = gs.albums[gs.ra], i = a.i | 0;
-        if (al.e[i] && i < gs.shown) { al.e[i] = { pid: al.e[i].pid, type: 'text', data: '(masqué par l’hôte)' }; ctx.ev({ k: 'rev', key: gs.ra + ':' + i, e: al.e[i], re: 1 }); }
-      }
-      else if (a.a === 'all' && ctx.isHost(pid)) { const al = gs.albums[gs.ra]; while (gs.shown < al.e.length) this.reveal(gs, ctx); }
-      else if (a.a === 'next' && ctx.isHost(pid)) {
+      else if (a.a === 'hide' && host) { if ((a.i | 0) < gs.shown) this.ban(gs, gs.ra, a.i | 0, ctx); }
+      else if (a.a === 'all' && host) { const al = gs.albums[gs.ra]; while (gs.shown < al.e.length) this.reveal(gs, ctx); }
+      else if (a.a === 'next' && host) {
         const al = gs.albums[gs.ra];
         if (gs.shown < al.e.length) this.reveal(gs, ctx);
         else if (gs.ra < gs.n - 1) { gs.ra++; gs.shown = 0; this.reveal(gs, ctx); }
         else { gs.endNote = 'Toutes les chaînes ont été dévoilées. Bravo les artistes !'; ctx.finish(gs, {}); }
       }
-      else if (a.a === 'end' && ctx.isHost(pid)) { gs.endNote = 'Bravo les artistes !'; ctx.finish(gs, {}); }
+      else if (a.a === 'end' && host) { gs.endNote = 'Bravo les artistes !'; ctx.finish(gs, {}); }
     }
   },
   tick(gs, now, ctx) {
@@ -1508,16 +1575,24 @@ GAMES.chaine = {
     const on = ctx.online(gs.ids);
     if (gs.phase === 'reveal') {
       const al = gs.albums[gs.ra];
-      return { phase: 'reveal', ra: gs.ra, n: gs.n, shown: gs.shown, len: al.e.length, owner: al.owner };
+      return { phase: 'reveal', ra: gs.ra, n: gs.n, shown: gs.shown, len: al.e.length, owner: al.owner, mod: gs.mod };
     }
-    return { phase: gs.phase, step: gs.step, K: gs.K, end: gs.end, dur: gs.dur, sub: !!gs.subs[pid], done: on.filter(id => gs.subs[id]).length, total: on.length,
-      pkey: gs.step > 0 ? gs.step + ':' + this.albumOf(gs, pid, gs.step) : null };
+    return { phase: gs.phase, step: gs.step, K: gs.K, end: gs.end, dur: gs.dur, sub: !!gs.subs[pid], refused: !!gs.refused[pid], done: on.filter(id => gs.subs[id]).length, total: on.length,
+      pkey: gs.step > 0 ? gs.step + ':' + this.albumOf(gs, pid, gs.step) : null, mod: gs.mod };
   },
   onEv(e) {
     if (e.k === 'prompt') { S.cache['p:' + e.key] = e; render(); }
     else if (e.k === 'rev') { S.cache['r:' + e.key] = e.e; if (e.re) { const [ra, i] = e.key.split(':'); const n = $(`#chAlbum [data-i="${i}"]`); if (n && S.gv && String(S.gv.ra) === ra) n.remove(); } render(); }
+    else if (e.k === 'refused') {
+      sfx.bad();
+      toast(e.type === 'img' ? 'L’hôte a refusé ton dessin. Recommence !' : 'L’hôte a refusé ta phrase. Écris-en une autre.', 4500);
+      if (S.chBoard) { S.chBoard.redraw([]); S.chBoard.edit = true; }
+      const i = $('#chIn'); if (i) { i.value = ''; i.disabled = false; }
+    }
+    else if (e.k === 'newprompt') { toast('La consigne a changé : l’étape précédente a été retirée.', 4500); }
   },
-  media(type, data) {
+  media(type, data, e) {
+    if (e && e.ban) return '<span class="muted">Retiré par l’hôte</span>';
     if (type === 'img') return data && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(data) ? `<img src="${data}" alt="Dessin">` : '<span class="muted">(dessin vide)</span>';
     return esc(data);
   },
@@ -1526,23 +1601,33 @@ GAMES.chaine = {
     const key = 'ch-' + v.step;
     const prompt = v.pkey ? S.cache['p:' + v.pkey] : null;
     const title = { write: 'Écris une phrase à faire dessiner', draw: 'Dessine cette phrase', desc: 'Décris ce dessin en une phrase' }[v.phase];
-    const built = scr(key, `
+    scr(key, `
       <div class="ghead"><span class="tag">Étape ${v.step + 1}/${v.K}</span><h2 class="grow">${title}</h2>${timerEl()}</div>
       ${tbarEl()}
       <div style="max-width:760px;margin:14px auto 0" class="col">
-        ${v.phase !== 'write' ? `<div class="prompt" id="chPrompt"></div>` : ''}
+        <div id="chWarn" class="banner bad center" hidden></div>
+        ${v.phase !== 'write' ? `<div id="chNote" class="banner center" hidden></div><div class="prompt" id="chPrompt"></div>` : ''}
         ${v.phase === 'draw' ? `<div class="boardwrap" id="chBoard"></div><div class="tools" id="chTools"></div>`
         : `<div class="row"><input class="field grow" id="chIn" maxlength="100" autocomplete="off" placeholder="${v.phase === 'write' ? 'Ex. Un hérisson qui fait du skate' : 'Ce que tu vois sur le dessin…'}">${v.phase === 'write' ? '<button class="btn" data-act="ch-idea">Une idée</button>' : ''}</div>`}
         <div class="row" style="justify-content:space-between"><span class="muted" id="chDone"></span><button class="btn go big" id="chSub" data-act="ch-sub">Valider</button></div>
       </div>`, () => {
       if (v.phase === 'draw') { const b = new Board(); b.edit = true; S.chBoard = b; S.activeBoard = b; b.mount($('#chBoard')); $('#chTools').innerHTML = toolsHTML(b); }
-      else { const i = $('#chIn'); i.focus(); i.addEventListener('keydown', e => { if (e.key === 'Enter') this.submit(); }); }
+      else { S.chBoard = null; const i = $('#chIn'); i.focus(); i.addEventListener('keydown', e => { if (e.key === 'Enter') this.submit(); }); }
     });
     if (v.phase !== 'write') {
-      const pe = $('#chPrompt');
-      if (prompt) { if (pe.dataset.k !== v.pkey) { pe.dataset.k = v.pkey; pe.innerHTML = this.media(prompt.type, prompt.data); } }
-      else if (!pe.dataset.asked) { pe.dataset.asked = 1; pe.innerHTML = '<span class="muted dots">Chargement</span>'; act({ a: 'need' }); }
+      const pe = $('#chPrompt'), ne = $('#chNote');
+      if (prompt) {
+        const pk = v.pkey + '|' + prompt.v;
+        if (pe.dataset.k !== pk) {
+          pe.dataset.k = pk;
+          pe.innerHTML = this.media(prompt.type, prompt.data);
+          ne.textContent = prompt.note || ''; ne.hidden = !prompt.note;
+        }
+      } else if (!pe.dataset.asked) { pe.dataset.asked = 1; pe.innerHTML = '<span class="muted dots">Chargement</span>'; act({ a: 'need' }); }
     }
+    const w = $('#chWarn');
+    w.hidden = !v.refused;
+    if (v.refused) w.textContent = v.phase === 'draw' ? 'L’hôte a refusé ton dessin. Fais-en un autre, correct cette fois.' : 'L’hôte a refusé ta phrase. Écris-en une autre.';
     const sb = $('#chSub');
     sb.textContent = v.sub ? 'Modifier' : 'Valider';
     sb.classList.toggle('go', !v.sub);
@@ -1550,6 +1635,7 @@ GAMES.chaine = {
     const inp = $('#chIn'); if (inp) inp.disabled = v.sub;
     $('#chDone').textContent = v.sub ? `Envoyé. ${v.done}/${v.total} prêts.` : `${v.done}/${v.total} prêts`;
     S.auto = v.sub ? null : () => this.submit(true);
+    if (isHost()) this.modPanel(v);
   },
   submit(auto) {
     const v = S.gv; if (!v) return;
@@ -1562,6 +1648,48 @@ GAMES.chaine = {
       act({ a: 'sub', x });
     }
   },
+
+  /* ----- panneau de modération (hôte uniquement, lit l'état local de l'hôte) ----- */
+  modOpen: false, modConfirm: null, modAll: false,
+  modPanel(v) {
+    const gs = Host.gs; if (!gs || Host.room.game !== 'chaine') return;
+    let dock = $('#modDock');
+    if (!dock) {
+      dock = document.createElement('div'); dock.id = 'modDock';
+      dock.innerHTML = `<button class="btn primary" id="modBtn" data-act="mod-toggle"></button><aside id="modPanel" class="card" hidden aria-label="Modération"></aside>`;
+      document.body.appendChild(dock);
+    }
+    const cur = gs.ids.filter(id => gs.subs[id]).map(id => ({ id, s: gs.subs[id] })).sort((a, b) => b.s.at - a.s.at);
+    const past = [];
+    let older = 0;
+    gs.albums.forEach((al, a) => al.e.forEach((e, i) => { if (!e.ban && this.usable(e) && !e.swapped) { if (this.modAll || i === gs.step - 1) past.push({ a, i, e }); else older++; } }));
+    past.sort((x, y) => y.i - x.i);
+    const nImg = cur.filter(c => c.s.type === 'img').length;
+    $('#modBtn').textContent = this.modOpen ? 'Fermer la modération' : `Modération · ${cur.length} reçu${cur.length > 1 ? 's' : ''}`;
+    const panel = $('#modPanel');
+    panel.hidden = !this.modOpen;
+    document.body.classList.toggle('modding', this.modOpen);
+    if (!this.modOpen) return;
+    const sig = [gs.step, gs.mod, cur.map(c => c.id + c.s.at).join(), past.length, older, this.modConfirm, this.modAll, Host.room.players.length].join('|');
+    if (panel.dataset.k === sig) return;
+    panel.dataset.k = sig;
+    const strike = id => gs.strikes[id] ? `<span class="tag" style="background:#ffd0d1">${gs.strikes[id]} refus</span>` : '';
+    const kick = id => id === Host.room.hostId ? '' : this.modConfirm === id
+      ? `<button class="btn small danger" data-act="mod-kick" data-id="${esc(id)}">Confirmer l’exclusion</button>`
+      : `<button class="btn small ghost" data-act="mod-kickask" data-id="${esc(id)}">Exclure</button>`;
+    const item = (pid, type, data, btn) => `<div class="moditem">
+        <div class="row" style="gap:6px">${avatar(pl(pid))}<b class="grow" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pnm(pid)}</b>${strike(pid)}</div>
+        <div class="modmedia">${this.media(type, data)}</div>
+        <div class="row" style="gap:6px">${btn}${kick(pid)}</div></div>`;
+    panel.innerHTML = `<div class="row" style="justify-content:space-between"><h3>Modération</h3><span class="muted" style="font-size:.85rem">Étape ${gs.step + 1}/${gs.K}</span></div>
+      <p class="muted" style="margin:4px 0 10px;font-size:.88rem">Refuser : l’élève recommence, avec au moins 30 s pour le refaire. Retirer : l’étape disparaît, la chaîne repart de l’étape d’avant.</p>
+      <span class="label">Cette étape (${cur.length}${nImg ? ', ' + nImg + ' dessin' + (nImg > 1 ? 's' : '') : ''})</span>
+      <div class="modgrid">${cur.map(c => item(c.id, c.s.type, c.s.data, `<button class="btn small danger" data-act="mod-refuse" data-id="${esc(c.id)}">Refuser</button>`)).join('') || '<p class="muted">Rien reçu pour l’instant.</p>'}</div>
+      ${past.length || older ? `<span class="label" style="margin-top:14px;display:block">${this.modAll ? 'Étapes déjà validées' : 'Étape précédente'}</span>
+      <div class="modgrid">${past.map(p => item(p.e.pid, p.e.type, p.e.data, `<button class="btn small" data-act="mod-ban" data-al="${p.a}" data-i="${p.i}">Retirer</button>`)).join('')}</div>
+      ${older || this.modAll ? `<button class="btn small" style="margin-top:10px" data-act="mod-all">${this.modAll ? 'Masquer les étapes plus anciennes' : 'Voir les étapes plus anciennes (' + older + ')'}</button>` : ''}` : ''}`;
+  },
+
   renderReveal(v) {
     scr('ch-rev-' + v.ra, `
       <div class="ghead"><span class="tag">Chaîne ${v.ra + 1}/${v.n}</span><h2 class="grow">La chaîne de ${pnm(v.owner)}</h2></div>
@@ -1574,7 +1702,7 @@ GAMES.chaine = {
       const e = S.cache['r:' + v.ra + ':' + i];
       if (!e) { missing = true; continue; }
       const d = document.createElement('div'); d.className = 'entry pop'; d.dataset.i = i;
-      d.innerHTML = `${avatar(pl(e.pid))}${isHost() ? `<button class="btn small ghost" data-act="ch-hide" data-i="${i}" style="order:3">Masquer</button>` : ''}<div class="bub"><div class="muted" style="font-size:.8rem;font-weight:600">${pnm(e.pid)}${e.type === 'img' ? ' a dessiné' : ' a écrit'}</div>${this.media(e.type, e.data)}</div>`;
+      d.innerHTML = `${avatar(pl(e.pid))}${isHost() && !e.ban ? `<button class="btn small ghost" data-act="ch-hide" data-i="${i}" style="order:3">Masquer</button>` : ''}<div class="bub"><div class="muted" style="font-size:.8rem;font-weight:600">${pnm(e.pid)}${e.type === 'img' ? ' a dessiné' : ' a écrit'}</div>${this.media(e.type, e.data, e)}</div>`;
       const after = [...al.children].find(c => +c.dataset.i > i);
       al.insertBefore(d, after || null);
       d.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -1590,6 +1718,12 @@ GAMES.chaine = {
     else if (a === 'ch-all') act({ a: 'all' });
     else if (a === 'ch-hide') act({ a: 'hide', i: +b.dataset.i });
     else if (a === 'ch-end') act({ a: 'end' });
+    else if (a === 'mod-toggle') { this.modOpen = !this.modOpen; this.modConfirm = null; render(); }
+    else if (a === 'mod-refuse') act({ a: 'refuse', id: b.dataset.id });
+    else if (a === 'mod-all') { this.modAll = !this.modAll; render(); }
+    else if (a === 'mod-ban') act({ a: 'ban', al: +b.dataset.al, i: +b.dataset.i });
+    else if (a === 'mod-kickask') { this.modConfirm = b.dataset.id; render(); }
+    else if (a === 'mod-kick') { this.modConfirm = null; act({ lobby: 'kick', id: b.dataset.id }); }
   }
 };
 
